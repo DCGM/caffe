@@ -4,6 +4,7 @@
 #include <leveldb/db.h>
 #include <pthread.h>
 
+#include <sstream>
 #include <string>
 #include <vector>
 #include <iostream>  // NOLINT(readability/streams)
@@ -19,6 +20,7 @@
 using std::iterator;
 using std::string;
 using std::pair;
+using std::istringstream;
 
 namespace caffe {
 
@@ -55,14 +57,14 @@ void* ImageDataLayerPrefetch(void* layer_pointer) {
     // get a blob
     CHECK_GT(lines_size, layer->lines_id_);
     if (!ReadImageToDatum(layer->lines_[layer->lines_id_].first,
-          layer->lines_[layer->lines_id_].second,
+          layer->lines_[layer->lines_id_].second[0],
           new_height, new_width, &datum)) {
       continue;
     }
     const string& data = datum.data();
+    int h_off = 0, w_off = 0;
     if (crop_size) {
       CHECK(data.size()) << "Image cropping only support uint8 data";
-      int h_off, w_off;
       // We only do random crop when we do training.
       if (layer->phase_ == Caffe::TRAIN) {
         h_off = layer->PrefetchRand() % (height - crop_size);
@@ -116,7 +118,31 @@ void* ImageDataLayerPrefetch(void* layer_pointer) {
       }
     }
 
-    top_label[item_id] = datum.label();
+    //int h_off = 0, w_off = 0; crop_size; height; width
+
+    for( int j = 0; j < layer->lines_[0].second.size(); j++){
+        if( image_data_param.transform_ann()){
+    		Dtype tmp = layer->lines_[layer->lines_id_].second[j];
+        	if( j % 2 == 0){ // processing x-coordinate
+        		if( crop_size){
+        			tmp = tmp - ((Dtype)h_off / (Dtype)crop_size);
+        			tmp = tmp * crop_size / width;
+        		}
+        		if( mirror){
+        			tmp = 1.0 - tmp;
+        		}
+        	} else { // processing y-coordinate
+        		if( crop_size){
+        			tmp = tmp - ((Dtype)w_off / (Dtype)crop_size);
+        			tmp = tmp * crop_size / height;
+        		}
+        	}
+    		top_label[item_id * layer->lines_[0].second.size() + j ] = tmp;
+        } else {
+        	top_label[item_id * layer->lines_[0].second.size() + j ] = layer->lines_[layer->lines_id_].second[j];
+        }
+    }
+
     // go to the next iter
     layer->lines_id_++;
     if (layer->lines_id_ >= lines_size) {
@@ -150,12 +176,30 @@ void ImageDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
   const string& source = this->layer_param_.image_data_param().source();
   LOG(INFO) << "Opening file " << source;
   std::ifstream infile(source.c_str());
-  string filename;
-  int label;
-  while (infile >> filename >> label) {
-    lines_.push_back(std::make_pair(filename, label));
+
+  const int maxlineLength = 100000;
+  char lineText[ maxlineLength];
+  while ( infile.getline( lineText, maxlineLength).good()) {
+	 vector< float> labels;
+	 string fileName;
+	 istringstream str( lineText);
+	 str >> fileName;
+	 float tmp;
+	 while( !(str >> tmp).fail()){
+		 labels.push_back( tmp);
+	 }
+	 lines_.push_back(std::make_pair(fileName, labels));
   }
 
+  CHECK( !lines_.empty()) << "Image list file is empty ";
+
+  // check all images have the same number of labels
+  for( unsigned int i = 1; i < lines_.size(); i++){
+	  CHECK( lines_[0].second.size() == lines_[i].second.size()) << "All images have to have the"
+			  " same number of labels.";
+  }
+
+  
   if (this->layer_param_.image_data_param().shuffle()) {
     // randomly shuffle data
     LOG(INFO) << "Shuffling data";
@@ -176,7 +220,7 @@ void ImageDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
   }
   // Read a data point, and use it to initialize the top blob.
   Datum datum;
-  CHECK(ReadImageToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
+  CHECK(ReadImageToDatum(lines_[lines_id_].first, lines_[lines_id_].second[0],
                          new_height, new_width, &datum));
   // image
   const int crop_size = this->layer_param_.image_data_param().crop_size();
@@ -195,9 +239,15 @@ void ImageDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
   LOG(INFO) << "output data size: " << (*top)[0]->num() << ","
       << (*top)[0]->channels() << "," << (*top)[0]->height() << ","
       << (*top)[0]->width();
-  // label
-  (*top)[1]->Reshape(batch_size, 1, 1, 1);
-  prefetch_label_.reset(new Blob<Dtype>(batch_size, 1, 1, 1));
+
+  // prepare space for labels
+  (*top)[1]->Reshape(batch_size, lines_[0].second.size(), 1, 1);
+  prefetch_label_.reset(new Blob<Dtype>(batch_size, lines_[0].second.size(), 1, 1)
+		  );
+  LOG(INFO) << "output label size: " << (*top)[1]->num() << ","
+      << (*top)[1]->channels() << "," << (*top)[1]->height() << ","
+      << (*top)[1]->width() << " " <<   lines_[0].second.size();
+
   // datum size
   datum_channels_ = datum.channels();
   datum_height_ = datum.height();
@@ -205,6 +255,7 @@ void ImageDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
   datum_size_ = datum.channels() * datum.height() * datum.width();
   CHECK_GT(datum_height_, crop_size);
   CHECK_GT(datum_width_, crop_size);
+
   // check if we want to have mean
   if (this->layer_param_.image_data_param().has_mean_file()) {
     BlobProto blob_proto;
@@ -219,6 +270,7 @@ void ImageDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
     // Simply initialize an all-empty mean.
     data_mean_.Reshape(1, datum_channels_, datum_height_, datum_width_);
   }
+
   // Now, start the prefetch thread. Before calling prefetch, we make two
   // cpu_data calls so that the prefetch thread does not accidentally make
   // simultaneous cudaMalloc calls when the main thread is running. In some
@@ -254,7 +306,7 @@ void ImageDataLayer<Dtype>::ShuffleImages() {
   for (int i = 0; i < num_images; ++i) {
     const int max_rand_index = num_images - i;
     const int rand_index = PrefetchRand() % max_rand_index;
-    pair<string, int> item = lines_[rand_index];
+    pair<string, vector< float> > item = lines_[rand_index];
     lines_.erase(lines_.begin() + rand_index);
     lines_.push_back(item);
   }
