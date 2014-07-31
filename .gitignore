@@ -1,3 +1,9 @@
+
+# Eclipse
+.cproject
+.settings/
+.project
+
 ## General
 
 # Compiled Object files

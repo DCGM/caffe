@@ -121,7 +121,7 @@ void* ImageDataLayerPrefetch(void* layer_pointer) {
     //int h_off = 0, w_off = 0; crop_size; height; width
 
     for( int j = 0; j < layer->lines_[0].second.size(); j++){
-        if( image_data_param.transform_ann()){
+/*        if( image_data_param.transform_ann()){
     		Dtype tmp = layer->lines_[layer->lines_id_].second[j];
         	if( j % 2 == 0){ // processing x-coordinate
         		if( crop_size){
@@ -138,9 +138,9 @@ void* ImageDataLayerPrefetch(void* layer_pointer) {
         		}
         	}
     		top_label[item_id * layer->lines_[0].second.size() + j ] = tmp;
-        } else {
+        } else {*/
         	top_label[item_id * layer->lines_[0].second.size() + j ] = layer->lines_[layer->lines_id_].second[j];
-        }
+//        }
     }
 
     // go to the next iter
