@@ -1,10 +1,10 @@
-
 # Eclipse
 .cproject
 .settings/
 .project
 
 ## General
+dep/
 
 # Compiled Object files
 *.slo
