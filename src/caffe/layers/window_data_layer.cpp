@@ -309,7 +309,7 @@ void WindowDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
       infile >> label >> overlap >> x1 >> y1 >> x2 >> y2;
 
       vector<float> window(WindowDataLayer::NUM);
-      window[WindowDataLayer::IMAGE_INDEX] = image_index;
+      window[WindowDataLayer::IMAGE_INDEX] = image_database_.size();
       window[WindowDataLayer::LABEL] = label;
       window[WindowDataLayer::OVERLAP] = overlap;
       window[WindowDataLayer::X1] = x1;
@@ -333,8 +333,8 @@ void WindowDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
       }
     }
 
-    if (image_index % 100 == 0) {
-      LOG(INFO) << "num: " << image_index << " "
+    if (image_database_.size() % 100 == 0) {
+      LOG(INFO) << "num: " << image_database_.size() << " "
           << image_path << " "
           << image_size[0] << " "
           << image_size[1] << " "
@@ -343,7 +343,7 @@ void WindowDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
     }
   } while (infile >> hashtag >> image_index);
 
-  LOG(INFO) << "Number of images: " << image_index+1;
+  LOG(INFO) << "Number of images: " << image_database_.size();
 
   for (map<int, int>::iterator it = label_hist.begin();
       it != label_hist.end(); ++it) {
