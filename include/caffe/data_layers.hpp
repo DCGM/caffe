@@ -294,14 +294,26 @@ class WindowDataLayer : public Layer<Dtype>, public InternalThread {
   virtual unsigned int PrefetchRand();
   virtual void InternalThreadEntry();
 
+  void PrintLayerInfo();
+  void PrepareBlobs( std::vector<Blob<Dtype>*>* top);
+  void PrepareMean();
+  void ParseWindowFile( std::istream &str);
+
   shared_ptr<Caffe::RNG> prefetch_rng_;
   Blob<Dtype> prefetch_data_;
   Blob<Dtype> prefetch_label_;
   Blob<Dtype> data_mean_;
   vector<std::pair<std::string, vector<int> > > image_database_;
-  enum WindowField { IMAGE_INDEX, LABEL, OVERLAP, X1, Y1, X2, Y2, NUM };
-  vector<vector<float> > fg_windows_;
-  vector<vector<float> > bg_windows_;
+  int image_channels_;
+
+  struct Window{
+	  unsigned int image_index;
+	  int label;
+	  float overlap, x1, x2, y1, y2;
+  };
+
+  vector<Window > fg_windows_;
+  vector<Window > bg_windows_;
 };
 
 }  // namespace caffe

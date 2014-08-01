@@ -64,7 +64,7 @@ void WindowDataLayer<Dtype>::InternalThreadEntry() {
     for (int dummy = 0; dummy < num_samples[is_fg]; ++dummy) {
       // sample a window
       const unsigned int rand_index = PrefetchRand();
-      vector<float> window = (is_fg) ?
+      Window window = (is_fg) ?
           fg_windows_[rand_index % fg_windows_.size()] :
           bg_windows_[rand_index % bg_windows_.size()];
 
@@ -75,20 +75,21 @@ void WindowDataLayer<Dtype>::InternalThreadEntry() {
 
       // load the image containing the window
       pair<std::string, vector<int> > image =
-          image_database_[window[WindowDataLayer<Dtype>::IMAGE_INDEX]];
+          image_database_[window.image_index];
 
       cv::Mat cv_img = cv::imread(image.first, CV_LOAD_IMAGE_COLOR);
       if (!cv_img.data) {
         LOG(ERROR) << "Could not open or find file " << image.first;
         return;
       }
+      CHECK_EQ( cv_img.channels(), image_channels_);
       const int channels = cv_img.channels();
 
       // crop window out of image and warp it
-      int x1 = window[WindowDataLayer<Dtype>::X1];
-      int y1 = window[WindowDataLayer<Dtype>::Y1];
-      int x2 = window[WindowDataLayer<Dtype>::X2];
-      int y2 = window[WindowDataLayer<Dtype>::Y2];
+      int x1 = window.x1;
+      int y1 = window.y1;
+      int x2 = window.x2;
+      int y2 = window.y2;
 
       int pad_w = 0;
       int pad_h = 0;
@@ -201,7 +202,7 @@ void WindowDataLayer<Dtype>::InternalThreadEntry() {
       }
 
       // get window label
-      top_label[item_id] = window[WindowDataLayer<Dtype>::LABEL];
+      top_label[item_id] = window.label;
 
       #if 0
       // useful debugging code for dumping transformed windows to disk
@@ -212,13 +213,13 @@ void WindowDataLayer<Dtype>::InternalThreadEntry() {
       std::ofstream inf((string("dump/") + file_id +
           string("_info.txt")).c_str(), std::ofstream::out);
       inf << image.first << std::endl
-          << window[WindowDataLayer<Dtype>::X1]+1 << std::endl
-          << window[WindowDataLayer<Dtype>::Y1]+1 << std::endl
-          << window[WindowDataLayer<Dtype>::X2]+1 << std::endl
-          << window[WindowDataLayer<Dtype>::Y2]+1 << std::endl
+          << window.x1 + 1 << std::endl
+          << window.y1 + 1 << std::endl
+          << window.x2 + 1 << std::endl
+          << window.y2 + 1 << std::endl
           << do_mirror << std::endl
           << top_label[item_id] << std::endl
-          << is_fg << std::endl;
+          << is_fg << std::endl;Blobs( vector<Blob<Dtype>*>*
       inf.close();
       std::ofstream top_data_file((string("dump/") + file_id +
           string("_data.txt")).c_str(),
@@ -265,112 +266,65 @@ void WindowDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
   //    num_windows
   //    class_index overlap x1 y1 x2 y2
 
-  LOG(INFO) << "Window data layer:" << std::endl
-      << "  foreground (object) overlap threshold: "
-      << this->layer_param_.window_data_param().fg_threshold() << std::endl
-      << "  background (non-object) overlap threshold: "
-      << this->layer_param_.window_data_param().bg_threshold() << std::endl
-      << "  foreground sampling fraction: "
-      << this->layer_param_.window_data_param().fg_fraction();
+  //TODO: the code is now fixed to 3 channels -- should be fixed
+  image_channels_ = 3;
+
+  PrintLayerInfo();
+  PrepareBlobs( top);
+  PrepareMean();
 
   std::ifstream infile(this->layer_param_.window_data_param().source().c_str());
   CHECK(infile.good()) << "Failed to open window file "
       << this->layer_param_.window_data_param().source() << std::endl;
+  ParseWindowFile( infile);
 
-  map<int, int> label_hist;
-  label_hist.insert(std::make_pair(0, 0));
+  // Start the prefetch thread. Before calling prefetch, we make two
+  // cpu_data calls so that the prefetch thread does not accidentally make
+  // simultaneous cudaMalloc calls when the main thread is running. In some
+  // GPUs this seems to cause failures if we do not so.
+  prefetch_data_.mutable_cpu_data();
+  prefetch_label_.mutable_cpu_data();
+  data_mean_.cpu_data();
+  DLOG(INFO) << "Initializing prefetch";
+  CreatePrefetchThread();
+  DLOG(INFO) << "Prefetch initialized.";
+}
 
-  string hashtag;
-  int image_index, channels;
-  if (!(infile >> hashtag >> image_index)) {
-    LOG(FATAL) << "Window file is empty";
-  }
-  do {
-    CHECK_EQ(hashtag, "#");
-    // read image path
-    string image_path;
-    infile >> image_path;
-    // read image dimensions
-    vector<int> image_size(3);
-    infile >> image_size[0] >> image_size[1] >> image_size[2];
-    channels = image_size[0];
-    image_database_.push_back(std::make_pair(image_path, image_size));
-
-    // read each box
-    int num_windows;
-    infile >> num_windows;
-    const float fg_threshold =
-        this->layer_param_.window_data_param().fg_threshold();
-    const float bg_threshold =
-        this->layer_param_.window_data_param().bg_threshold();
-    for (int i = 0; i < num_windows; ++i) {
-      int label, x1, y1, x2, y2;
-      float overlap;
-      infile >> label >> overlap >> x1 >> y1 >> x2 >> y2;
-
-      vector<float> window(WindowDataLayer::NUM);
-      window[WindowDataLayer::IMAGE_INDEX] = image_database_.size();
-      window[WindowDataLayer::LABEL] = label;
-      window[WindowDataLayer::OVERLAP] = overlap;
-      window[WindowDataLayer::X1] = x1;
-      window[WindowDataLayer::Y1] = y1;
-      window[WindowDataLayer::X2] = x2;
-      window[WindowDataLayer::Y2] = y2;
-
-      // add window to foreground list or background list
-      if (overlap >= fg_threshold) {
-        int label = window[WindowDataLayer::LABEL];
-        CHECK_GT(label, 0);
-        fg_windows_.push_back(window);
-        label_hist.insert(std::make_pair(label, 0));
-        label_hist[label]++;
-      } else if (overlap < bg_threshold) {
-        // background window, force label and overlap to 0
-        window[WindowDataLayer::LABEL] = 0;
-        window[WindowDataLayer::OVERLAP] = 0;
-        bg_windows_.push_back(window);
-        label_hist[0]++;
-      }
-    }
-
-    if (image_database_.size() % 100 == 0) {
-      LOG(INFO) << "num: " << image_database_.size() << " "
-          << image_path << " "
-          << image_size[0] << " "
-          << image_size[1] << " "
-          << image_size[2] << " "
-          << "windows to process: " << num_windows;
-    }
-  } while (infile >> hashtag >> image_index);
-
-  LOG(INFO) << "Number of images: " << image_database_.size();
-
-  for (map<int, int>::iterator it = label_hist.begin();
-      it != label_hist.end(); ++it) {
-    LOG(INFO) << "class " << it->first << " has " << label_hist[it->first]
-              << " samples";
-  }
-
+template <typename Dtype>
+void WindowDataLayer<Dtype>::PrintLayerInfo(){
+  LOG(INFO) << "Window data layer:" << std::endl
+    << "  foreground (object) overlap threshold: "
+    << this->layer_param_.window_data_param().fg_threshold() << std::endl
+    << "  background (non-object) overlap threshold: "
+    << this->layer_param_.window_data_param().bg_threshold() << std::endl
+    << "  foreground sampling fraction: "
+    << this->layer_param_.window_data_param().fg_fraction();
   LOG(INFO) << "Amount of context padding: "
-      << this->layer_param_.window_data_param().context_pad();
-
+    << this->layer_param_.window_data_param().context_pad();
   LOG(INFO) << "Crop mode: "
-      << this->layer_param_.window_data_param().crop_mode();
+    << this->layer_param_.window_data_param().crop_mode();
+}
 
-  // image
+template <typename Dtype>
+void WindowDataLayer<Dtype>::PrepareBlobs( vector<Blob<Dtype>*>* top){
+
   int crop_size = this->layer_param_.window_data_param().crop_size();
   CHECK_GT(crop_size, 0);
   const int batch_size = this->layer_param_.window_data_param().batch_size();
-  (*top)[0]->Reshape(batch_size, channels, crop_size, crop_size);
-  prefetch_data_.Reshape(batch_size, channels, crop_size, crop_size);
+  (*top)[0]->Reshape(batch_size, image_channels_, crop_size, crop_size);
+  prefetch_data_.Reshape(batch_size, image_channels_, crop_size, crop_size);
 
   LOG(INFO) << "output data size: " << (*top)[0]->num() << ","
-      << (*top)[0]->channels() << "," << (*top)[0]->height() << ","
-      << (*top)[0]->width();
-  // label
+    << (*top)[0]->channels() << "," << (*top)[0]->height() << ","
+    << (*top)[0]->width();
+
   (*top)[1]->Reshape(batch_size, 1, 1, 1);
   prefetch_label_.Reshape(batch_size, 1, 1, 1);
+}
 
+template <typename Dtype>
+void WindowDataLayer<Dtype>::PrepareMean(){
+  int crop_size = this->layer_param_.window_data_param().crop_size();
   // check if we want to have mean
   if (this->layer_param_.window_data_param().has_mean_file()) {
     const string& mean_file =
@@ -381,21 +335,68 @@ void WindowDataLayer<Dtype>::SetUp(const vector<Blob<Dtype>*>& bottom,
     data_mean_.FromProto(blob_proto);
     CHECK_EQ(data_mean_.num(), 1);
     CHECK_EQ(data_mean_.width(), data_mean_.height());
-    CHECK_EQ(data_mean_.channels(), channels);
+    CHECK_EQ(data_mean_.channels(), image_channels_);
   } else {
     // Simply initialize an all-empty mean.
-    data_mean_.Reshape(1, channels, crop_size, crop_size);
+    data_mean_.Reshape(1, image_channels_, crop_size, crop_size);
   }
-  // Now, start the prefetch thread. Before calling prefetch, we make two
-  // cpu_data calls so that the prefetch thread does not accidentally make
-  // simultaneous cudaMalloc calls when the main thread is running. In some
-  // GPUs this seems to cause failures if we do not so.
-  prefetch_data_.mutable_cpu_data();
-  prefetch_label_.mutable_cpu_data();
-  data_mean_.cpu_data();
-  DLOG(INFO) << "Initializing prefetch";
-  CreatePrefetchThread();
-  DLOG(INFO) << "Prefetch initialized.";
+}
+
+template <typename Dtype>
+void WindowDataLayer<Dtype>::ParseWindowFile( std::istream &infile){
+  map<int, int> label_hist;
+
+   string hashtag;
+   int image_index, channels;
+   if (!(infile >> hashtag >> image_index)) {
+     LOG(FATAL) << "Window file is empty";
+   }
+   do {
+     CHECK_EQ(hashtag, "#");
+     // read image path
+     string image_path;
+     infile >> image_path;
+     // read image dimensions
+     vector<int> image_size(3);
+     infile >> image_size[0] >> image_size[1] >> image_size[2];
+     channels = image_size[0];
+     CHECK_EQ( channels, image_channels_);
+     image_database_.push_back(std::make_pair(image_path, image_size));
+
+     // read each box
+     int num_windows;
+     infile >> num_windows;
+     const float fg_threshold =
+         this->layer_param_.window_data_param().fg_threshold();
+     const float bg_threshold =
+         this->layer_param_.window_data_param().bg_threshold();
+     for (int i = 0; i < num_windows; ++i) {
+       Window window;
+       infile >> window.label >> window.overlap >> window.x1 >> window.y1 >> window.x2 >> window.y2;
+       window.image_index = image_database_.size();
+
+       // add window to foreground list or background list
+       if (window.overlap >= fg_threshold) {
+         CHECK_GT(window.label, 0);
+         fg_windows_.push_back(window);
+         label_hist[ window.label]++;
+       } else if (window.overlap < bg_threshold) {
+         // background window, force label and overlap to 0
+       window.label = 0;
+       window.overlap = 0;
+         bg_windows_.push_back(window);
+         label_hist[0]++;
+       }
+     }
+
+   } while (infile >> hashtag >> image_index);
+
+   LOG(INFO) << "Number of images: " << image_database_.size();
+   for (map<int, int>::iterator it = label_hist.begin();
+       it != label_hist.end(); ++it) {
+     LOG(INFO) << "class " << it->first << " has " << label_hist[it->first]
+               << " samples";
+   }
 }
 
 template <typename Dtype>
