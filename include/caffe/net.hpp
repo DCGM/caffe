@@ -158,6 +158,23 @@ class Net {
   static bool StateMeetsRule(const NetState& state, const NetStateRule& rule,
       const string& layer_name);
 
+  void get_stats(vector<string>& param_id_names, vector<Dtype>& stats_data) const
+  {
+    for(size_t param_id = 0; param_id < params_.size(); param_id++)
+    {
+      // Get parameter - blob
+      const Blob<Dtype>& blob_param = *params_[param_id];
+      // Get parameters name - it's id(in scope of layer not net) or name(if defined)
+      const std::string& param_id_name = param_display_names_[param_id];
+
+      // Compute the blob defined stats
+      //ToDo implement more statistics (add methods to blob class) and switch between them
+      Dtype sum_abs = blob_param.asum_data();
+      param_id_names.push_back(param_id_name);
+      stats_data.push_back(sum_abs);
+    }
+  }
+
  protected:
   // Helpers for Init.
   /// @brief Append a new input or top blob to the net.
