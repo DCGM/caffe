@@ -5,7 +5,7 @@ layers {
   top: "data"
   top: "label"
   data_param {
-    source: "examples/mnist/mnist_train_lmdb"
+    source: "/home/isvoboda/FIT/ITS/caffe/examples/mnist/mnist_train_lmdb"
     backend: LMDB
     batch_size: 64
   }
@@ -20,7 +20,7 @@ layers {
   top: "data"
   top: "label"
   data_param {
-    source: "examples/mnist/mnist_test_lmdb"
+    source: "/home/isvoboda/FIT/ITS/caffe/examples/mnist/mnist_test_lmdb"
     backend: LMDB
     batch_size: 100
   }
@@ -47,7 +47,10 @@ layers {
     bias_filler {
       type: "constant"
     }
+   
   }
+  param: "conv1_w"
+  param: "conv1_b"
 }
 layers {
   name: "pool1"
@@ -78,6 +81,8 @@ layers {
       type: "constant"
     }
   }
+  param: "conv2_w"
+  param: "conv2_b"
 }
 layers {
   name: "pool2"
@@ -106,6 +111,8 @@ layers {
       type: "constant"
     }
   }
+  param: "ip1_w"
+  param: "ip1_b"
 }
 layers {
   name: "relu1"
@@ -129,6 +136,8 @@ layers {
       type: "constant"
     }
   }
+  param: "ip2_w"
+  param: "ip2_b"
 }
 layers {
   name: "accuracy"
