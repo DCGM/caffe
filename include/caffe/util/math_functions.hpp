@@ -149,6 +149,12 @@ DEFINE_CAFFE_CPU_UNARY_FUNC(fabs, y[i] = std::fabs(x[i]));
 template <typename Dtype>
 void caffe_cpu_scale(const int n, const Dtype alpha, const Dtype *x, Dtype* y);
 
+/**
+ * Compute the median of given array and its size.
+ * @param size Size of the data array.
+ * @param data data Array of data to compute the quantile.
+ * @return the value of median.
+ */
 template <typename Dtype>
 Dtype caffe_cpu_median(const size_t size, const Dtype* data)
 {
@@ -157,6 +163,13 @@ Dtype caffe_cpu_median(const size_t size, const Dtype* data)
 	 return data_vec[size_t(size/2)];
 }
 
+/**
+ * Compute given quantile.
+ * @param size Size of the data array.
+ * @param data Array of data to compute the quantile.
+ * @param quantile Define the quantile (0;1> (To compute the quantile 0.25: quantile = 0.25).
+ * @return Value of the quantile.
+ */
 template <typename Dtype>
 Dtype caffe_cpu_quantile(const size_t size, const Dtype* data, const Dtype quantile)
 {
@@ -167,6 +180,12 @@ Dtype caffe_cpu_quantile(const size_t size, const Dtype* data, const Dtype quant
 	return data_vec[quantile_index];
 }
 
+/**
+ * Compute the mean of values stored in array data of size size.
+ * @param size Size of the data array.
+ * @param data Array of data to compute the mean.
+ * @return Mean
+ */
 template <typename Dtype>
 Dtype caffe_cpu_mean(const size_t size, const Dtype* data)
 {

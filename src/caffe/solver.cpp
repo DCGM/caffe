@@ -218,7 +218,7 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     {
       stringstream sstream;
       sstream << "  Iter_n: " << iter_;
-      sstream << "Statistics: ";
+      sstream << " Statistics: ";
       sstream << param_id_names[param_i];
       for(size_t i = 0; i < stat_data[param_i].size(); i++)
       {
