@@ -212,12 +212,23 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     //Print statistics data
     // Id or param names in scope of particular layer
     vector<string> param_id_names;
-    vector<Dtype> stat_data;
+    vector<vector<Dtype> > stat_data;
     net_->get_stats(param_id_names, stat_data);
-    for(size_t stat_i = 0; stat_i < param_id_names.size(); stat_i++)
+    for(size_t param_i = 0; param_i < param_id_names.size(); param_i++)
     {
-      LOG(INFO) << "	Statistics: " << param_id_names[stat_i] << " " <<
-      stat_data[stat_i];
+      stringstream sstream;
+      sstream << "  Iter_n: " << iter_;
+      sstream << "Statistics: ";
+      sstream << param_id_names[param_i];
+      for(size_t i = 0; i < stat_data[param_i].size(); i++)
+      {
+    	  sstream << " ";
+    	  sstream << stat_data[param_i][i];
+      }
+
+      //ToDo: Add the layer id/name
+      //Statistics: param_name sum_abs median mean quant4
+      LOG(INFO) << sstream.str();
     }
   }
 

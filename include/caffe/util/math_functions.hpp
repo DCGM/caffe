@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <cmath>  // for std::fabs and std::signbit
+#include <algorithm> // for stats computing (median, quantils)
+#include <numeric> // for stats computing (mean)
 
 #include "glog/logging.h"
 
@@ -146,6 +148,31 @@ DEFINE_CAFFE_CPU_UNARY_FUNC(fabs, y[i] = std::fabs(x[i]));
 
 template <typename Dtype>
 void caffe_cpu_scale(const int n, const Dtype alpha, const Dtype *x, Dtype* y);
+
+template <typename Dtype>
+Dtype caffe_cpu_median(const size_t size, const Dtype* data)
+{
+	 vector<Dtype> data_vec(data, data+size);
+	 std::nth_element(data_vec.begin(), data_vec.begin()+size_t(size/2), data_vec.end());
+	 return data_vec[size_t(size/2)];
+}
+
+template <typename Dtype>
+Dtype caffe_cpu_quantile(const size_t size, const Dtype* data, const Dtype quantile)
+{
+	assert(quantile <= static_cast<Dtype>(1));
+	vector<Dtype> data_vec(data, data+size);
+	size_t quantile_index = size_t(size*quantile);
+	std::nth_element(data_vec.begin(), data_vec.begin()+quantile_index, data_vec.end());
+	return data_vec[quantile_index];
+}
+
+template <typename Dtype>
+Dtype caffe_cpu_mean(const size_t size, const Dtype* data)
+{
+	Dtype sum = std::accumulate(data, data+size, static_cast<Dtype>(0.0));
+	return sum/static_cast<Dtype>(size);
+}
 
 #ifndef CPU_ONLY  // GPU
 
