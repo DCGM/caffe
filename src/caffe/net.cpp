@@ -344,8 +344,11 @@ void Net<Dtype>::get_stats(vector<string>& param_id_names, vector<vector<Dtype> 
 	  Dtype sum_pow = caffe_cpu_pow_sum(data_size, data);
 	  size_t n_zero_elements = caffe_cpu_n_zero_elements(data_size, data);
 	  Dtype mean = caffe_cpu_mean(data_size, data);
+	  Dtype quant_05 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.05));
+	  Dtype quant_25 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.25));
 	  Dtype median = caffe_cpu_median(data_size,data);
-	  Dtype quant_4 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.25));
+	  Dtype quant_75 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.75));
+	  Dtype quant_95 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.95));
 
 	  vector<Dtype> param_stat_data;
 	  param_stat_data.push_back(sum_abs);
@@ -353,8 +356,12 @@ void Net<Dtype>::get_stats(vector<string>& param_id_names, vector<vector<Dtype> 
 	  param_stat_data.push_back(static_cast<Dtype>(n_zero_elements));
 	  param_stat_data.push_back(static_cast<Dtype>(data_size));
 	  param_stat_data.push_back(mean);
+	  param_stat_data.push_back(quant_05);
+	  param_stat_data.push_back(quant_25);
 	  param_stat_data.push_back(median);
-	  param_stat_data.push_back(quant_4);
+	  param_stat_data.push_back(quant_75);
+	  param_stat_data.push_back(quant_95);
+
 
 	  stats_data.push_back(param_stat_data);
 
