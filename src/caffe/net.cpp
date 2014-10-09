@@ -327,6 +327,41 @@ bool Net<Dtype>::StateMeetsRule(const NetState& state,
   return true;
 }
 
+template<typename Dtype>
+void Net<Dtype>::get_stats(vector<string>& param_id_names, vector<vector<Dtype> >& stats_data) const
+{
+	for(size_t param_id = 0; param_id < params_.size(); param_id++)
+	{
+	  // Get parameter - blob
+	  const Blob<Dtype>& blob_param = *params_[param_id];
+	  // Get parameters name - it's id(in scope of layer not net) or name(if defined)
+	  const std::string& param_id_name = param_display_names_[param_id];
+
+	  const Dtype* data = blob_param.cpu_data();
+	  size_t data_size = blob_param.count();
+
+	  Dtype sum_abs = blob_param.asum_data();
+	  Dtype sum_pow = caffe_cpu_pow_sum(data_size, data);
+	  size_t n_zero_elements = caffe_cpu_n_zero_elements(data_size, data);
+	  Dtype mean = caffe_cpu_mean(data_size, data);
+	  Dtype median = caffe_cpu_median(data_size,data);
+	  Dtype quant_4 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.25));
+
+	  vector<Dtype> param_stat_data;
+	  param_stat_data.push_back(sum_abs);
+	  param_stat_data.push_back(sum_pow);
+	  param_stat_data.push_back(static_cast<Dtype>(n_zero_elements));
+	  param_stat_data.push_back(static_cast<Dtype>(data_size));
+	  param_stat_data.push_back(mean);
+	  param_stat_data.push_back(median);
+	  param_stat_data.push_back(quant_4);
+
+	  stats_data.push_back(param_stat_data);
+
+	  param_id_names.push_back(param_id_name);
+	}
+}
+
 // Helper for Net::Init: add a new input or top blob to the net.  (Inputs have
 // layer_id == -1, tops have layer_id >= 0.)
 template <typename Dtype>

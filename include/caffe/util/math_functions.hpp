@@ -193,6 +193,30 @@ Dtype caffe_cpu_mean(const size_t size, const Dtype* data)
 	return sum/static_cast<Dtype>(size);
 }
 
+/**
+ * Compute the number of zero elements in array data.
+ * @param size Size of array data.
+ * @param data Array of values.
+ * @return number of zero elements.
+ */
+template <typename Dtype>
+size_t caffe_cpu_n_zero_elements(const size_t size, const Dtype* data)
+{
+	return std::count(data, data+size, static_cast<Dtype>(0));
+}
+
+/**
+ * Compute the sum of second powers of values in array data.
+ * @param size Size of array data.
+ * @param data Array of values.
+ * @return Sum of second powers.
+ */
+template <typename Dtype>
+Dtype caffe_cpu_pow_sum(const size_t size, const Dtype* data)
+{
+	return std::inner_product(data, data+size, data, static_cast<Dtype>(0));
+}
+
 #ifndef CPU_ONLY  // GPU
 
 // Decaf gpu gemm provides an interface that is almost the same as the cpu

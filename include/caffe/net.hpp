@@ -158,34 +158,7 @@ class Net {
   static bool StateMeetsRule(const NetState& state, const NetStateRule& rule,
       const string& layer_name);
 
-  void get_stats(vector<string>& param_id_names, vector<vector<Dtype> >& stats_data) const
-  {
-    for(size_t param_id = 0; param_id < params_.size(); param_id++)
-    {
-      // Get parameter - blob
-      const Blob<Dtype>& blob_param = *params_[param_id];
-      // Get parameters name - it's id(in scope of layer not net) or name(if defined)
-      const std::string& param_id_name = param_display_names_[param_id];
-
-      const Dtype* data = blob_param.cpu_data();
-      size_t data_size = blob_param.count();
-
-      Dtype sum_abs = blob_param.asum_data();
-      Dtype median = caffe_cpu_median(data_size,data);
-      Dtype quant_4 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.25));
-      Dtype mean = caffe_cpu_mean(data_size, data);
-
-      vector<Dtype> param_stat_data;
-      param_stat_data.push_back(sum_abs);
-      param_stat_data.push_back(median);
-      param_stat_data.push_back(mean);
-      param_stat_data.push_back(quant_4);
-
-      stats_data.push_back(param_stat_data);
-
-      param_id_names.push_back(param_id_name);
-    }
-  }
+  void get_stats(vector<string>& param_id_names, vector<vector<Dtype> >& stats_data) const;
 
  protected:
   // Helpers for Init.

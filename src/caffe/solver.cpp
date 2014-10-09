@@ -227,7 +227,7 @@ void Solver<Dtype>::Solve(const char* resume_file) {
       }
 
       //ToDo: Add the layer id/name
-      //Statistics: param_name sum_abs median mean quant4
+      //Iter_n: iter_number Statistics: param_name sum_abs sum_pow n_zero_elements data_size mean median quant4
       LOG(INFO) << sstream.str();
     }
   }
