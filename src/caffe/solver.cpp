@@ -214,13 +214,14 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     vector<string> param_id_names;
     vector<vector<Dtype> > stat_data;
     net_->get_stats(param_id_names, stat_data);
-    //ToDo Sorted: quant_0.05 and quant_0.95 quant_0.25 and quant_0.75
     LOG(INFO)
     << "Statistics: iter param_name sum_abs sum_pow n_zero_elements data_size mean quant_0.05 quant_0.25 median quant_0.75 quant_0,95";
     for(size_t param_i = 0; param_i < param_id_names.size(); param_i++)
     {
+      const string& layer_name = net_->layer_names()[net_->param_layer_indices()[param_i].first];
       stringstream sstream;
       sstream << "Statistics: " << iter_ << " ";
+      sstream << layer_name << ":";
       sstream << param_id_names[param_i];
       for(size_t i = 0; i < stat_data[param_i].size(); i++)
       {
