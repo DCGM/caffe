@@ -335,7 +335,12 @@ void Net<Dtype>::get_stats(vector<string>& param_id_names, vector<vector<Dtype> 
 	  // Get parameter - blob
 	  const Blob<Dtype>& blob_param = *params_[param_id];
 	  // Get parameters name - it's id(in scope of layer not net) or name(if defined)
+	  // and it's layer name and combine it together
+	  // layer:param
 	  const std::string& param_id_name = param_display_names_[param_id];
+	  const string& layer_name = layer_names_[param_layer_indices_[param_id].first];
+	  std::stringstream layer_param_name;
+	  layer_param_name << layer_name << ":" << param_id_name;
 
 	  const Dtype* data = blob_param.cpu_data();
 	  size_t data_size = blob_param.count();
@@ -362,10 +367,9 @@ void Net<Dtype>::get_stats(vector<string>& param_id_names, vector<vector<Dtype> 
 	  param_stat_data.push_back(quant_75);
 	  param_stat_data.push_back(quant_95);
 
-
 	  stats_data.push_back(param_stat_data);
 
-	  param_id_names.push_back(param_id_name);
+	  param_id_names.push_back(layer_param_name.str());
 	}
 }
 
