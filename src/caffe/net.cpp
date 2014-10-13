@@ -327,52 +327,6 @@ bool Net<Dtype>::StateMeetsRule(const NetState& state,
   return true;
 }
 
-template<typename Dtype>
-void Net<Dtype>::get_stats(vector<string>& param_id_names, vector<vector<Dtype> >& stats_data) const
-{
-	for(size_t param_id = 0; param_id < params_.size(); param_id++)
-	{
-	  // Get parameter - blob
-	  const Blob<Dtype>& blob_param = *params_[param_id];
-	  // Get parameters name - it's id(in scope of layer not net) or name(if defined)
-	  // and it's layer name and combine it together
-	  // layer:param
-	  const std::string& param_id_name = param_display_names_[param_id];
-	  const string& layer_name = layer_names_[param_layer_indices_[param_id].first];
-	  std::stringstream layer_param_name;
-	  layer_param_name << layer_name << ":" << param_id_name;
-
-	  const Dtype* data = blob_param.cpu_data();
-	  size_t data_size = blob_param.count();
-
-	  Dtype sum_abs = blob_param.asum_data();
-	  Dtype sum_pow = caffe_cpu_pow_sum(data_size, data);
-	  size_t n_zero_elements = caffe_cpu_n_zero_elements(data_size, data);
-	  Dtype mean = caffe_cpu_mean(data_size, data);
-	  Dtype quant_05 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.05));
-	  Dtype quant_25 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.25));
-	  Dtype median = caffe_cpu_median(data_size,data);
-	  Dtype quant_75 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.75));
-	  Dtype quant_95 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.95));
-
-	  vector<Dtype> param_stat_data;
-	  param_stat_data.push_back(sum_abs);
-	  param_stat_data.push_back(sum_pow);
-	  param_stat_data.push_back(static_cast<Dtype>(n_zero_elements));
-	  param_stat_data.push_back(static_cast<Dtype>(data_size));
-	  param_stat_data.push_back(mean);
-	  param_stat_data.push_back(quant_05);
-	  param_stat_data.push_back(quant_25);
-	  param_stat_data.push_back(median);
-	  param_stat_data.push_back(quant_75);
-	  param_stat_data.push_back(quant_95);
-
-	  stats_data.push_back(param_stat_data);
-
-	  param_id_names.push_back(layer_param_name.str());
-	}
-}
-
 // Helper for Net::Init: add a new input or top blob to the net.  (Inputs have
 // layer_id == -1, tops have layer_id >= 0.)
 template <typename Dtype>
@@ -863,6 +817,82 @@ const shared_ptr<Layer<Dtype> > Net<Dtype>::layer_by_name(
     LOG(WARNING) << "Unknown layer name " << layer_name;
   }
   return layer_ptr;
+}
+
+template<typename Dtype>
+void Net<Dtype>::GetStats(const Blob<Dtype>& blob_data, vector<Dtype>& stat_data) const
+{
+
+	  const Dtype* data = blob_data.cpu_data();
+	  size_t data_size = blob_data.count();
+
+	  Dtype sum_abs = blob_data.asum_data();
+	  Dtype sum_pow = caffe_cpu_pow_sum(data_size, data);
+	  size_t n_zero_elements = caffe_cpu_n_zero_elements(data_size, data);
+	  Dtype mean = caffe_cpu_mean(data_size, data);
+	  Dtype quant_05 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.05));
+	  Dtype quant_25 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.25));
+	  Dtype median = caffe_cpu_median(data_size,data);
+	  Dtype quant_75 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.75));
+	  Dtype quant_95 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.95));
+
+	  stat_data.clear();
+	  stat_data.push_back(sum_abs);
+	  stat_data.push_back(sum_pow);
+	  stat_data.push_back(static_cast<Dtype>(n_zero_elements));
+	  stat_data.push_back(static_cast<Dtype>(data_size));
+	  stat_data.push_back(mean);
+	  stat_data.push_back(quant_05);
+	  stat_data.push_back(quant_25);
+	  stat_data.push_back(median);
+	  stat_data.push_back(quant_75);
+	  stat_data.push_back(quant_95);
+
+}
+
+template<typename Dtype>
+void Net<Dtype>::GetStatsParam(vector<string>& param_id_names, vector<vector<Dtype> >& stats_data) const
+{
+	for(size_t param_id = 0; param_id < params_.size(); param_id++)
+	{
+	  // Get parameters name - it's id(in scope of layer not net) or name(if defined)
+	  // and it's layer name and combine it together
+	  // layer:param
+	  const std::string& param_id_name = param_display_names_[param_id];
+	  const string& layer_name = layer_names_[param_layer_indices_[param_id].first];
+	  std::stringstream layer_param_name;
+	  layer_param_name << layer_name << ":" << param_id_name;
+
+	  // Get parameter - blob
+	  const Blob<Dtype>& blob_param = *params_[param_id];
+	  // Create the vector to store the stats in
+ 	  vector<Dtype> param_stat_data;
+ 	  // Get stats from the blob_param
+ 	  GetStats(blob_param, param_stat_data);
+	  stats_data.push_back(param_stat_data);
+	  param_id_names.push_back(layer_param_name.str());
+	}
+}
+
+template<typename Dtype>
+void Net<Dtype>::GetStatsActivation(vector<string>& layer_names, vector<vector<Dtype> >& stats_data) const
+{
+	for(size_t layer_id = 0; layer_id < layers_.size(); layer_id++)
+	{
+		for (int top_id = 0; top_id < top_vecs_[layer_id].size(); top_id++)
+		{
+		    const Blob<Dtype>& blob = *top_vecs_[layer_id][top_id];
+		    const string& blob_name = blob_names_[top_id_vecs_[layer_id][top_id]];
+		    const string& layer_name = layer_names_[layer_id];
+		    stringstream layer_blob_name;
+		    layer_blob_name << layer_name << ":" << blob_name;
+
+		    vector<Dtype> stat_data;
+		    GetStats(blob, stat_data);
+		    stats_data.push_back(stat_data);
+		    layer_names.push_back(layer_blob_name.str());
+		}
+	}
 }
 
 INSTANTIATE_CLASS(Net);
