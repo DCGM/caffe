@@ -582,9 +582,17 @@ void Net<Dtype>::ForwardDebugInfo(const int layer_id) {
     const Blob<Dtype>& blob = *top_vecs_[layer_id][top_id];
     const string& blob_name = blob_names_[top_id_vecs_[layer_id][top_id]];
     const Dtype data_abs_val_mean = blob.asum_data() / blob.count();
+    vector<Dtype> stats;
+    GetStats(blob, stats);
+    stringstream stats_stringstream;
+    for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
+    {
+    	stats_stringstream << " " << stats[stat_i];
+    }
+
     LOG(INFO) << "    [Forward] "
        << "Layer " << layer_names_[layer_id] << ", top blob " << blob_name
-       << " data: " << data_abs_val_mean;
+       << " data: " << data_abs_val_mean << stats_stringstream.str();
   }
 }
 
@@ -596,18 +604,36 @@ void Net<Dtype>::BackwardDebugInfo(const int layer_id) {
     const Blob<Dtype>& blob = *bottom_vec[bottom_id];
     const string& blob_name = blob_names_[bottom_id_vecs_[layer_id][bottom_id]];
     const Dtype diff_abs_val_mean = blob.asum_diff() / blob.count();
+
+    vector<Dtype> stats;
+	GetStats(blob, stats);
+	stringstream stats_stringstream;
+	for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
+	{
+		stats_stringstream << " " << stats[stat_i];
+	}
+
     LOG(INFO) << "    [Backward] "
         << "Layer " << layer_names_[layer_id] << ", bottom blob " << blob_name
-        << " diff: " << diff_abs_val_mean;
+        << " diff: " << diff_abs_val_mean << stats_stringstream.str();
   }
   for (int param_id = 0; param_id < layers_[layer_id]->blobs().size();
        ++param_id) {
     if (!layers_[layer_id]->param_propagate_down(param_id)) { continue; }
     const Blob<Dtype>& blob = *layers_[layer_id]->blobs()[param_id];
     const Dtype diff_abs_val_mean = blob.asum_diff() / blob.count();
+
+    vector<Dtype> stats;
+	GetStats(blob, stats);
+	stringstream stats_stringstream;
+	for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
+	{
+		stats_stringstream << " " << stats[stat_i];
+	}
+
     LOG(INFO) << "    [Backward] "
         << "Layer " << layer_names_[layer_id] << ", param blob " << param_id
-        << " diff: " << diff_abs_val_mean;
+        << " diff: " << diff_abs_val_mean << stats_stringstream.str();
   }
 }
 
@@ -848,51 +874,6 @@ void Net<Dtype>::GetStats(const Blob<Dtype>& blob_data, vector<Dtype>& stat_data
 	  stat_data.push_back(quant_75);
 	  stat_data.push_back(quant_95);
 
-}
-
-template<typename Dtype>
-void Net<Dtype>::GetStatsParam(vector<string>& param_id_names, vector<vector<Dtype> >& stats_data) const
-{
-	for(size_t param_id = 0; param_id < params_.size(); param_id++)
-	{
-	  // Get parameters name - it's id(in scope of layer not net) or name(if defined)
-	  // and it's layer name and combine it together
-	  // layer:param
-	  const std::string& param_id_name = param_display_names_[param_id];
-	  const string& layer_name = layer_names_[param_layer_indices_[param_id].first];
-	  std::stringstream layer_param_name;
-	  layer_param_name << layer_name << ":" << param_id_name;
-
-	  // Get parameter - blob
-	  const Blob<Dtype>& blob_param = *params_[param_id];
-	  // Create the vector to store the stats in
- 	  vector<Dtype> param_stat_data;
- 	  // Get stats from the blob_param
- 	  GetStats(blob_param, param_stat_data);
-	  stats_data.push_back(param_stat_data);
-	  param_id_names.push_back(layer_param_name.str());
-	}
-}
-
-template<typename Dtype>
-void Net<Dtype>::GetStatsActivation(vector<string>& layer_names, vector<vector<Dtype> >& stats_data) const
-{
-	for(size_t layer_id = 0; layer_id < layers_.size(); layer_id++)
-	{
-		for (int top_id = 0; top_id < top_vecs_[layer_id].size(); top_id++)
-		{
-		    const Blob<Dtype>& blob = *top_vecs_[layer_id][top_id];
-		    const string& blob_name = blob_names_[top_id_vecs_[layer_id][top_id]];
-		    const string& layer_name = layer_names_[layer_id];
-		    stringstream layer_blob_name;
-		    layer_blob_name << layer_name << ":" << blob_name;
-
-		    vector<Dtype> stat_data;
-		    GetStats(blob, stat_data);
-		    stats_data.push_back(stat_data);
-		    layer_names.push_back(layer_blob_name.str());
-		}
-	}
 }
 
 INSTANTIATE_CLASS(Net);

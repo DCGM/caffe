@@ -159,9 +159,6 @@ class Net {
   static bool StateMeetsRule(const NetState& state, const NetStateRule& rule,
       const string& layer_name);
 
-  void GetStatsParam(vector<string>& param_id_names, vector<vector<Dtype> >& stats_data) const;
-  void GetStatsActivation(vector<string>& layer_id_names, vector<vector<Dtype> >& stats_data) const;
-
  protected:
   // Helpers for Init.
   /// @brief Append a new input or top blob to the net.
@@ -186,7 +183,12 @@ class Net {
   /// @brief Get misc parameters, e.g. the LR multiplier and weight decay.
   void GetLearningRateAndWeightDecay();
 
-  /// @brief Compute the basic stats over blob data
+  /// @brief Compute the basic stats of blob data
+  /**
+   * Compute basic stats of blob data
+   * @param data Input data
+   * @param stats_data Result statistics: 0:sum_abs 1:sum_pow 2:n_zero_elements 3:data_size 4:mean 5:quant_05 6:quant_25 7:median 8:quant_75 9:quant_95
+   */
   void GetStats(const Blob<Dtype>& data, vector<Dtype>& stats_data) const;
 
   /// @brief Individual layers in the net

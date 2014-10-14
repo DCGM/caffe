@@ -208,56 +208,6 @@ void Solver<Dtype>::Solve(const char* resume_file) {
               << result_vec[k] << loss_msg_stream.str();
         }
       }
-
-    // Print statistics data
-
-    // Id or param names in scope of particular layer
-    vector<string> param_id_names;
-
-    // Compute the stats of param blobs
-    vector<vector<Dtype> > stats_param;
-    net_->GetStatsParam(param_id_names, stats_param);
-
-    LOG(INFO)
-    << "Parameter statistics: iter layer:param_name sum_abs sum_pow n_zero_elements data_size mean quant_0.05 quant_0.25 median quant_0.75 quant_0,95";
-
-    for(size_t param_i = 0; param_i < param_id_names.size(); param_i++)
-    {
-      stringstream sstream;
-      sstream << "Param statistics: " << iter_ << " ";
-      sstream << param_id_names[param_i];
-      for(size_t i = 0; i < stats_param[param_i].size(); i++)
-      {
-    	  sstream << " ";
-    	  sstream << stats_param[param_i][i];
-      }
-
-      //Statistics: iter param_name sum_abs sum_pow n_zero_elements data_size mean quant_0.05 quant_0.25 median quant_0.75 quant_0,95
-      LOG(INFO) << sstream.str();
-    }
-    
-    LOG(INFO)
-	<< "Activation statistics: iter layer:blob_name sum_abs sum_pow n_zero_elements data_size mean quant_0.05 quant_0.25 median quant_0.75 quant_0,95";
-    
-    vector<string> layer_blob_names;
-    vector<vector<Dtype> > stats_activations;
-    net_->GetStatsActivation(layer_blob_names, stats_activations);
-    
-    for(size_t stat_i = 0; stat_i < stats_activations.size(); stat_i++)
-	{
-	  stringstream sstream;
-	  sstream << "Activation statistics: " << iter_ << " ";
-	  sstream << layer_blob_names[stat_i];
-	  for(size_t i = 0; i < stats_activations[stat_i].size(); i++)
-	  {
-		  sstream << " ";
-		  sstream << stats_activations[stat_i][i];
-	  }
-
-	  //Statistics: iter param_name sum_abs sum_pow n_zero_elements data_size mean quant_0.05 quant_0.25 median quant_0.75 quant_0,95
-	  LOG(INFO) << sstream.str();
-	}
-    
   }
 
     ComputeUpdateValue();
