@@ -615,7 +615,10 @@ void Net<Dtype>::BackwardDebugInfo(const int layer_id) {
 
     LOG(INFO) << "    [Backward] "
         << "Layer " << layer_names_[layer_id] << ", bottom blob " << blob_name
-        << " diff: " << diff_abs_val_mean << stats_stringstream.str();
+        << " diff: " << diff_abs_val_mean;
+    LOG(INFO) << "    [Backward] "
+		<< "Layer " << layer_names_[layer_id] << ", bottom blob " << blob_name
+		<< " data: " << stats_stringstream.str();
   }
   for (int param_id = 0; param_id < layers_[layer_id]->blobs().size();
        ++param_id) {
@@ -630,10 +633,12 @@ void Net<Dtype>::BackwardDebugInfo(const int layer_id) {
 	{
 		stats_stringstream << " " << stats[stat_i];
 	}
-
     LOG(INFO) << "    [Backward] "
         << "Layer " << layer_names_[layer_id] << ", param blob " << param_id
-        << " diff: " << diff_abs_val_mean << stats_stringstream.str();
+        << " diff: " << diff_abs_val_mean;
+    LOG(INFO) << "    [Backward] "
+		<< "Layer " << layer_names_[layer_id] << ", param blob " << param_id
+		<< " data: " << stats_stringstream.str();
   }
 }
 
@@ -644,11 +649,20 @@ void Net<Dtype>::UpdateDebugInfo(const int param_id) {
   const string& layer_name = layer_names_[param_layer_indices_[param_id].first];
   const string& param_display_name = param_display_names_[param_id];
   const Dtype diff_abs_val_mean = blob.asum_diff() / blob.count();
+
+  vector<Dtype> stats;
+  GetStats(blob, stats);
+  stringstream stats_stringstream;
+  for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
+  {
+  	stats_stringstream << " " << stats[stat_i];
+  }
+
   if (param_owner < 0) {
     const Dtype data_abs_val_mean = blob.asum_data() / blob.count();
     LOG(INFO) << "    [Update] Layer " << layer_name
         << ", param " << param_display_name
-        << " data: " << data_abs_val_mean << "; diff: " << diff_abs_val_mean;
+        << " data: " << data_abs_val_mean << " " << stats_stringstream.str() << "; diff: " << diff_abs_val_mean;
   } else {
     const string& owner_layer_name =
         layer_names_[param_layer_indices_[param_owner].first];
