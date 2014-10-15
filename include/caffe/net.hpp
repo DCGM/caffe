@@ -186,10 +186,11 @@ class Net {
   /// @brief Compute the basic stats of blob data
   /**
    * Compute basic stats of blob data
+   * @param data_size  size of data
    * @param data Input data
    * @param stats_data Result statistics: 0:sum_abs 1:sum_pow 2:n_zero_elements 3:data_size 4:mean 5:quant_05 6:quant_25 7:median 8:quant_75 9:quant_95
    */
-  void GetStats(const Blob<Dtype>& data, vector<Dtype>& stats_data) const;
+  void GetStats(size_t data_size, const Dtype* data, vector<Dtype>& stats_data) const;
 
   /// @brief Individual layers in the net
   vector<shared_ptr<Layer<Dtype> > > layers_;

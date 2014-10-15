@@ -583,7 +583,7 @@ void Net<Dtype>::ForwardDebugInfo(const int layer_id) {
     const string& blob_name = blob_names_[top_id_vecs_[layer_id][top_id]];
     const Dtype data_abs_val_mean = blob.asum_data() / blob.count();
     vector<Dtype> stats;
-    GetStats(blob, stats);
+    GetStats(blob.count(), blob.cpu_data(), stats);
     stringstream stats_stringstream;
     for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
     {
@@ -606,7 +606,7 @@ void Net<Dtype>::BackwardDebugInfo(const int layer_id) {
     const Dtype diff_abs_val_mean = blob.asum_diff() / blob.count();
 
     vector<Dtype> stats;
-	GetStats(blob, stats);
+	GetStats(blob.count(), blob.cpu_diff(), stats);
 	stringstream stats_stringstream;
 	for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
 	{
@@ -615,10 +615,7 @@ void Net<Dtype>::BackwardDebugInfo(const int layer_id) {
 
     LOG(INFO) << "    [Backward] "
         << "Layer " << layer_names_[layer_id] << ", bottom blob " << blob_name
-        << " diff: " << diff_abs_val_mean;
-    LOG(INFO) << "    [Backward] "
-		<< "Layer " << layer_names_[layer_id] << ", bottom blob " << blob_name
-		<< " data: " << stats_stringstream.str();
+        << " diff: " << diff_abs_val_mean << " " << stats_stringstream.str();
   }
   for (int param_id = 0; param_id < layers_[layer_id]->blobs().size();
        ++param_id) {
@@ -627,18 +624,16 @@ void Net<Dtype>::BackwardDebugInfo(const int layer_id) {
     const Dtype diff_abs_val_mean = blob.asum_diff() / blob.count();
 
     vector<Dtype> stats;
-	GetStats(blob, stats);
+	GetStats(blob.count(), blob.cpu_diff(), stats);
 	stringstream stats_stringstream;
 	for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
 	{
 		stats_stringstream << " " << stats[stat_i];
 	}
-    LOG(INFO) << "    [Backward] "
+
+	LOG(INFO) << "    [Backward] "
         << "Layer " << layer_names_[layer_id] << ", param blob " << param_id
-        << " diff: " << diff_abs_val_mean;
-    LOG(INFO) << "    [Backward] "
-		<< "Layer " << layer_names_[layer_id] << ", param blob " << param_id
-		<< " data: " << stats_stringstream.str();
+        << " diff: " << diff_abs_val_mean << " " << stats_stringstream.str();;
   }
 }
 
@@ -650,27 +645,40 @@ void Net<Dtype>::UpdateDebugInfo(const int param_id) {
   const string& param_display_name = param_display_names_[param_id];
   const Dtype diff_abs_val_mean = blob.asum_diff() / blob.count();
 
-  vector<Dtype> stats;
-  GetStats(blob, stats);
-  stringstream stats_stringstream;
-  for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
+  vector<Dtype> stats_diff;
+  GetStats(blob.count(), blob.cpu_diff(), stats_diff);
+  stringstream stats_diff_stringstream;
+  for(size_t stat_i = 0; stat_i < stats_diff.size(); stat_i++)
   {
-  	stats_stringstream << " " << stats[stat_i];
+  	stats_diff_stringstream << " " << stats_diff[stat_i];
   }
 
   if (param_owner < 0) {
+	vector<Dtype> stats;
+    GetStats(blob.count(), blob.cpu_data(), stats);
+	stringstream stats_stringstream;
+	for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
+	{
+		stats_stringstream << " " << stats[stat_i];
+	}
+
     const Dtype data_abs_val_mean = blob.asum_data() / blob.count();
     LOG(INFO) << "    [Update] Layer " << layer_name
         << ", param " << param_display_name
-        << " data: " << data_abs_val_mean << " " << stats_stringstream.str() << "; diff: " << diff_abs_val_mean;
+        << " data: " << data_abs_val_mean << " " << stats_stringstream.str();
+
+    LOG(INFO) << "    [Update] Layer " << layer_name
+		<< ", param " << param_display_name
+		<< " diff: " << diff_abs_val_mean << " " << stats_diff_stringstream.str();
   } else {
+
     const string& owner_layer_name =
         layer_names_[param_layer_indices_[param_owner].first];
     LOG(INFO) << "    [Update] Layer " << layer_name
         << ", param blob " << param_display_name
         << " (owned by layer " << owner_layer_name << ", "
         << "param " << param_display_names_[param_owners_[param_id]] << ")"
-        << " diff: " << diff_abs_val_mean;
+        << " diff: " << diff_abs_val_mean << " " << stats_diff_stringstream;
   }
 }
 
@@ -860,13 +868,9 @@ const shared_ptr<Layer<Dtype> > Net<Dtype>::layer_by_name(
 }
 
 template<typename Dtype>
-void Net<Dtype>::GetStats(const Blob<Dtype>& blob_data, vector<Dtype>& stat_data) const
+void Net<Dtype>::GetStats(size_t data_size, const Dtype* data, vector<Dtype>& stat_data) const
 {
 
-	  const Dtype* data = blob_data.cpu_data();
-	  size_t data_size = blob_data.count();
-
-	  Dtype sum_abs = blob_data.asum_data();
 	  Dtype sum_pow = caffe_cpu_pow_sum(data_size, data);
 	  size_t n_zero_elements = caffe_cpu_n_zero_elements(data_size, data);
 	  Dtype mean = caffe_cpu_mean(data_size, data);
@@ -877,7 +881,6 @@ void Net<Dtype>::GetStats(const Blob<Dtype>& blob_data, vector<Dtype>& stat_data
 	  Dtype quant_95 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.95));
 
 	  stat_data.clear();
-	  stat_data.push_back(sum_abs);
 	  stat_data.push_back(sum_pow);
 	  stat_data.push_back(static_cast<Dtype>(n_zero_elements));
 	  stat_data.push_back(static_cast<Dtype>(data_size));
