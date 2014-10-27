@@ -874,11 +874,11 @@ void Net<Dtype>::GetStats(size_t data_size, const Dtype* data, vector<Dtype>& st
 	  Dtype sum_pow = caffe_cpu_pow_sum(data_size, data);
 	  size_t n_zero_elements = caffe_cpu_n_zero_elements(data_size, data);
 	  Dtype mean = caffe_cpu_mean(data_size, data);
-	  Dtype quant_05 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.05));
+	  Dtype quant_05 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.005));
 	  Dtype quant_25 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.25));
 	  Dtype median = caffe_cpu_median(data_size,data);
 	  Dtype quant_75 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.75));
-	  Dtype quant_95 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.95));
+	  Dtype quant_95 = caffe_cpu_quantile(data_size, data, static_cast<Dtype>(0.995));
 
 	  stat_data.clear();
 	  stat_data.push_back(sum_pow);
