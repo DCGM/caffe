@@ -6,11 +6,26 @@ import random
 import copy
 from collections import OrderedDict, defaultdict
 from operator import itemgetter
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 
+
+
+def noException( func):
+    def dec(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except:
+            print "Exception"
+            raise
+    return dec
+
+@noException
 def plotLoss(loss, test, plotName):
+    print plotName
     fig, axes1 = plt.subplots(figsize=(22, 14), dpi=120)
     axes2 = axes1.twinx()
     allVal = loss.copy()
@@ -41,7 +56,8 @@ def smooth(data, filterSize):
     return signal.convolve(extendedData, filterKernel, mode="valid")
 
 
-def plotStat(stat, getter, plotName, filterSize=1):
+@noException
+def plotStat(stat, getter, plotName, filterSize=1, logPlot=True):
     """
 
     :type stat: dict of list of pairs (iteration, list of values)
@@ -49,6 +65,7 @@ def plotStat(stat, getter, plotName, filterSize=1):
     :type plotName: string
     :type filterSize: int
     """
+    print plotName
     fig, axes1 = plt.subplots(figsize=(22, 14), dpi=120)
     colormap = plt.get_cmap("spectral")
     plt.gca().set_color_cycle([colormap(i) for i in np.linspace(0, 0.95, len(stat))])
@@ -57,7 +74,10 @@ def plotStat(stat, getter, plotName, filterSize=1):
         iterations = np.array([x[0] for x in stat[name]])
         values = [getter(x[1]) for x in stat[name]]
         values = smooth(values, filterSize)
-        axes1.semilogy(iterations, values, label=name)
+        if logPlot:
+            axes1.semilogy(iterations, values, label=name)
+        else:
+            axes1.plot(iterations, values, label=name)
         axes1.annotate(name, xy=(iterations[-1], values[-1]))
 
     axes1.legend(loc="upper right")
@@ -65,7 +85,9 @@ def plotStat(stat, getter, plotName, filterSize=1):
     plt.close(fig)
 
 
+@noException
 def plotAll( stat, name):
+    print name
     plt.figure(figsize=(16, 8), dpi=120)
     plt.title(name)
     plt.xlabel('Iteration')
@@ -141,12 +163,13 @@ for line in sys.stdin.readlines():
         pass
 
 
+
 plotLoss(loss, test, "loss.png")
 weightData = OrderedDict([(k,v) for (k,v) in updateData.iteritems() if "_0" in k])
 biasData = OrderedDict([(k,v) for (k,v) in updateData.iteritems() if not "_0" in k])
 weightUpdate = OrderedDict([(k,v) for (k,v) in updateDiff.iteritems() if "_0" in k])
 biasUpdate = OrderedDict([(k,v) for (k,v) in updateDiff.iteritems() if not "_0" in k])
-for filterKernel in [1, 15]:
+for filterKernel in [15]:
     plotStat(weightUpdate, lambda x: x[0], "net_weight_update_meanAbs_%02d.png" % filterKernel, filterSize=filterKernel)
     plotStat(biasUpdate, lambda x: x[0], "net_bias_update_meanAbs_%02d.png" % filterKernel, filterSize=filterKernel)
 
@@ -154,42 +177,39 @@ for filterKernel in [1]:
     plotStat(weightData, lambda x: x[0], "net_weight_data_meanAbs_%02d.png" % filterKernel, filterSize=filterKernel)
     plotStat(biasData, lambda x: x[0], "net_bias_data_meanAbs_%02d.png" % filterKernel, filterSize=filterKernel)
 
-for filterKernel in [1]:
-    plotStat(weightData, lambda x: x[1]/x[3], "net_weight_data_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
-    plotStat(biasData, lambda x: x[1]/x[3], "net_bias_data_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
+#for filterKernel in [1]:
+#    plotStat(weightData, lambda x: x[1]/x[3], "net_weight_data_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
+#    plotStat(biasData, lambda x: x[1]/x[3], "net_bias_data_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
 
-for filterKernel in [15]:
-    plotStat(weightUpdate, lambda x: x[1]/x[3], "net_weight_update_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
-    plotStat(biasUpdate, lambda x: x[1]/x[3], "net_bias_update_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
-for filterKernel in [15]:
-    plotStat(weightUpdate, lambda x: x[1], "net_weight_update_energy_%02d.png" % filterKernel, filterSize=filterKernel)
-    plotStat(biasUpdate, lambda x: x[1], "net_bias_update_energy_%02d.png" % filterKernel, filterSize=filterKernel)
+#for filterKernel in [15]:
+#    plotStat(weightUpdate, lambda x: x[1]/x[3], "net_weight_update_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
+#    plotStat(biasUpdate, lambda x: x[1]/x[3], "net_bias_update_mean2_%02d.png" % filterKernel, filterSize=filterKernel)
+#for filterKernel in [15]:
+#    plotStat(weightUpdate, lambda x: x[1], "net_weight_update_energy_%02d.png" % filterKernel, filterSize=filterKernel)
+#    plotStat(biasUpdate, lambda x: x[1], "net_bias_update_energy_%02d.png" % filterKernel, filterSize=filterKernel)
 
 
-rawActivations = OrderedDict([(k,v) for (k,v) in forward.iteritems() if "fc" in k or "conv" in k])
+rawActivations = OrderedDict([(k,v) for (k,v) in forward.iteritems() if "FC" == k[:2] or "CONV" == k[:4]])
 plotStat(rawActivations, lambda x: x[0], "net_activations_raw_meanAbs.png")
 
-reluActivations = OrderedDict([(k,v) for (k,v) in forward.iteritems() if "relu" in k])
+reluActivations = OrderedDict([(k,v) for (k,v) in forward.iteritems() if "RELU" in k])
 plotStat(reluActivations, lambda x: x[0], "net_activations_relu_meanAbs.png")
-plotStat(reluActivations, lambda x: x[2]/x[3], "net_activations_sparsity.png")
+plotStat(reluActivations, lambda x: x[2]/x[3], "net_activations_sparsity.png", logPlot=False)
 
-print backward.keys()
-activationDiff = OrderedDict([(k,v) for (k,v) in backward.iteritems() if ("-_fc" in k or "-_conv" in k) and not ("drop" in k or "pool" in k)])
+activationDiff = OrderedDict([(k,v) for (k,v) in backward.iteritems() if "RELU" == k[:4]])
 plotStat(activationDiff, lambda x: x[0], "net_activations_diff_21.png", filterSize=21)
 
-weightDiff = OrderedDict([(k,v) for (k,v) in backward.iteritems() if "_0" in k])
-biasDiff = OrderedDict([(k,v) for (k,v) in backward.iteritems() if "_1" in k])
+weightDiff = OrderedDict([(k,v) for (k,v) in backward.iteritems() if "_0_" in k])
+biasDiff = OrderedDict([(k,v) for (k,v) in backward.iteritems() if "_1_" in k])
 plotStat(weightDiff, lambda x: x[0], "net_weight_diff_15.png", filterSize=15)
-plotStat(biasDiff, lambda x: x[0], "net_weight_diff_15.png", filterSize=15)
+plotStat(biasDiff, lambda x: x[0], "net_bias_diff_15.png", filterSize=15)
 
 for name in updateData:
     plotAll(updateData[name], "stat_param_" + name)
 for name in updateDiff:
     plotAll(updateDiff[name], "stat_update_" + name)
 for name in forward:
-    print name
     plotAll(forward[name], "stat_forward_" + name)
 for name in backward:
-    print name
     plotAll(backward[name], "stat_backward_" + name)
 
