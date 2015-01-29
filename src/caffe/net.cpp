@@ -576,6 +576,29 @@ void Net<Dtype>::BackwardFromTo(int start, int end) {
   }
 }
 
+
+// compute channel sparsity histogram
+template <typename Dtype>
+vector<int> SparsityHist(const Blob<Dtype>& blob)
+{
+  const Dtype *data = blob.cpu_data();
+  vector< int> hist( 24, 0);
+  for( unsigned c = 0; c < blob.channels(); c++){
+    int zeroCount = 0;
+    for( unsigned n = 0; n < blob.num(); n++){
+      for( unsigned x = 0; x < blob.width(); x++){
+        for( unsigned y = 0; y < blob.height(); y++){
+          zeroCount += data[ blob.offset( n, c, y, x)] == 0;
+        }
+      }
+    }
+    double sparsity = static_cast<double>( zeroCount) / static_cast<double>( blob.num()*blob.width()*blob.height());
+    int index = int( sparsity * (hist.size()-1));
+    hist[ index]++;
+  }
+  return hist;
+}
+
 template <typename Dtype>
 void Net<Dtype>::ForwardDebugInfo(const int layer_id) {
   for (int top_id = 0; top_id < top_vecs_[layer_id].size(); ++top_id) {
@@ -588,6 +611,11 @@ void Net<Dtype>::ForwardDebugInfo(const int layer_id) {
     for(size_t stat_i = 0; stat_i < stats.size(); stat_i++)
     {
     	stats_stringstream << " " << stats[stat_i];
+    }
+    vector<int> hist = SparsityHist(blob);
+    for(unsigned i = 0; i < hist.size(); i++)
+    {
+      stats_stringstream << " " << hist[i];
     }
 
     LOG(INFO) << "    [Forward] "
