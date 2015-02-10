@@ -79,7 +79,9 @@ void ImageDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       << top[0]->channels() << "," << top[0]->height() << ","
       << top[0]->width();
   // label
-  top[1]->Reshape(batch_size, 1, 1, 1);
+  if( this->output_labels_){
+    top[1]->Reshape(batch_size, 1, 1, 1);
+  }
   this->prefetch_label_.Reshape(batch_size, 1, 1, 1);
 }
 
