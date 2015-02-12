@@ -353,6 +353,8 @@ message TransformationParameter {
   // or can be repeated the same number of times as channels
   // (would subtract them from the corresponding channel)
   repeated float mean_value = 5;
+  // If true, cropped region is fixed to central region during traing as it is during testing.
+  optional bool fixed_crop = 6 [default = false];
 }
 
 // Message that stores parameters used by AccuracyLayer
